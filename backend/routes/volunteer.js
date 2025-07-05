@@ -1,30 +1,38 @@
 import express from "express";
-import {register,volunteers, login , volunteerProfile , updateVolunteer, deleteVolunteer, logout } from "../controllers/volunteerController.js"
-import {registerValidation,loginValidation} from "../middlewares/authValidator.js"
-import verifyRole from "../middlewares/verifyRole.js"
-import verifyToken from "../middlewares/authJwt.js"
+import {
+  register,
+  volunteers,
+  login,
+  volunteerProfile,
+  updateVolunteer,
+  deleteVolunteer,
+  logout,
+} from "../controllers/volunteerController.js";
+import { registerValidation, loginValidation } from "../middlewares/authValidator.js";
+import verifyRole from "../middlewares/verifyRole.js";
+import verifyToken from "../middlewares/authJwt.js";
 
 const router = express.Router();
 
-// registre route with registre validation
-router.post("/register", registerValidation,register);
-
-// log in of user
+// Public routes
+router.post("/register", registerValidation, register);
 router.post("/login", loginValidation, login);
 
-// get volunteer profile by using his id 
-router.get("/profile/:id" ,verifyToken,volunteerProfile);
+// Authenticated routes
+router.get("/profile/:id", verifyToken, volunteerProfile);
+router.get("/volunteers", verifyToken, volunteers);
+router.put("/vol/update/:id", verifyToken, async (req, res, next) => {
+  const loggedInUserId = req.volunteerData.id;
+  const loggedInUserRole = req.volunteerData.role;
+  const targetId = req.params.id;
 
-// we use that route to get all volunteers inf
-router.get("/volunteers", verifyToken,volunteers);
-
-// adding a middlewares for verifying role
-router.put("/vol/update/:id" ,  verifyRole,updateVolunteer)
-
-router.delete("/vol/delete/:id" , verifyRole, deleteVolunteer)
-
-// log out router
-router.delete('/logout', verifyToken,logout)
-
+  if (loggedInUserRole === "admin" || loggedInUserId === targetId) {
+    next();
+  } else {
+    return res.status(403).json({ message: "You don't have permission to update this user." });
+  }
+}, updateVolunteer);
+router.delete("/vol/delete/:id", verifyRole, deleteVolunteer);
+router.delete("/logout", verifyToken, logout);
 
 export default router;

@@ -1,271 +1,173 @@
-import express from "express";
+import Volunteer from "../models/volunteerModel.js";
+import Role from "../models/roleModel.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import asyncHandler from "express-async-handler";
-import Volunteer from "../models/volunteerModel.js";
-import mongoose from "mongoose";
-import redis from "redis";
-import Role from "../models/roleModel.js"
 
-export const register = asyncHandler(async (req , res) => {
+// Register a new volunteer
+export const register = async (req, res) => {
+  try {
+    const { fullName, email, password, city, phone_number, role } = req.body;
 
-    const { name , email , password , phone_number, city } = req.body;
-
-    const verifyEmail = await Volunteer.findOne({ email: email });
-
-    try {
-        
-        if (verifyEmail) {
-
-            return res.status(403).json({ message: "Email already exist !" });
-
-        } else {
-
-            bcrypt.hash(req.body.password , 10)
-                .then((hash) => {
-
-                    const volunteer = new Volunteer({
-
-                        name: name,
-                        email: email,
-                        password: hash,
-                        phone_number: phone_number,
-                        city:city,
-
-                    })
-
-                    volunteer.save()
-                        .then((response) => {
-
-                            return res.status(201).json({
-
-                                message: "Volunteer successfuly created !",
-                                result: response
-
-                            })
-
-                        })
-                        .catch((err) => {
-
-                            res.status(500).json({ error: err });
-
-                        })
-
-                });
-
-        }
-
-    } catch (error) {
-        
-        return res.status(412).send({
-
-            message: error.message
-
-        })
-
+    if (!["volunteer", "admin"].includes(role)) {
+      return res.status(400).json({ message: "Invalid role specified" });
     }
 
-});
+    const existingVolunteer = await Volunteer.findOne({ email });
+    if (existingVolunteer) {
+      return res.status(409).json({ message: "Email already registered" });
+    }
 
-export const login = asyncHandler( async (req , res) => {
+    const roleDoc = await Role.findOne({ role_name: role });
+    if (!roleDoc) {
+      return res.status(400).json({ message: "Invalid role specified" });
+    }
 
-    const { email , password } = req.body;
-    
-    let getVolunteer;
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-    Volunteer.findOne({
-
-        email: email
-
-    })
-        .then((volunteer) => {
-
-            if (!volunteer) {
-
-                res.status(401).json({
-
-                    message: "Authentication Failed !"
-
-                })
-
-            }
-
-            getVolunteer = volunteer;
-
-            return bcrypt.compare(password, volunteer.password);
-
-        })
-        .then(async (response) => {
-
-            if (!response) {
-
-                res.status(412).json({
-
-                    message: "Authentication Failed !"
-
-                })
-
-            } else {
-
-                let jwtToken = jwt.sign({
-
-                    email: getVolunteer.email,
-                    password: getVolunteer.password
-
-                } , process.env.JWT_SECRET , {
-
-                    expiresIn: "1h"
-
-                })
-
-                res.cookie("token" , jwtToken , {
-
-                    httpOnly: true
-
-                })
-
-                const role = await Role.findById(getVolunteer.role_id);
-
-                return res.status(200).json({accessToken: jwtToken , volunteerId: getVolunteer._id , roleName: role.role_name , group: getVolunteer.group })
-
-            }
-
-        })
-        .catch((err) => {
-
-            return res.status(401).json({
-
-                message: err.message ,
-                success: false
-
-            })
-
-        })
-
-});
-
-export const logout = asyncHandler( async(req, res , next) => {
-    
-    req.headers.authorization = null;
-
-    res.clearCookie("token");
-
-    res.status(200).json({
-
-        success:true,
-        message: "Volunteer Loged Out Successfuly !",
-        data:{}
-
+    const newVolunteer = new Volunteer({
+      fullName,
+      email,
+      password: hashedPassword,
+      city,
+      phone_number,
+      role_id: roleDoc._id,
     });
 
-})
+    await newVolunteer.save();
 
-export const volunteerProfile = asyncHandler( async(req , res , next) => {
+    const token = jwt.sign(
+      { email: newVolunteer.email, id: newVolunteer._id, role: roleDoc.role_name },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-    const { id:_id } = req.params;
+    res.status(201).json({
+      message: "Registered successfully",
+      token,
+      volunteer: {
+        id: newVolunteer._id,
+        fullName: newVolunteer.fullName,
+        email: newVolunteer.email,
+        role: roleDoc.role_name,
+      },
+    });
+  } catch (err) {
+    console.error("Error registering volunteer:", err);
+    res.status(500).json({ message: "Error registering", error: err.message });
+  }
+};
 
-    try {
-        
-        const verifyVolunteer = await Volunteer.findOne({_id: _id});
+// Login
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
 
-        if (!verifyVolunteer) {
-
-            res.status(403).json({
-
-                message: "Volunteer not found !",
-                success: false
-
-            })
-
-        } else {
-
-            res.status(201).json({
-
-                message: `volunteer: ${verifyVolunteer.name}`,
-                success: true
-
-            })
-
-        }
-
-    } catch (error) {
-
-        res.status(401).json({
-
-            success: false,
-            message: error.message
-
-        })
-
+    const volunteer = await Volunteer.findOne({ email }).populate("role_id", "role_name");
+    if (!volunteer) {
+      return res.status(404).json({ message: "Volunteer not found" });
     }
 
-})
-
-export const volunteers = asyncHandler( async(req , res) => {
-
-    try {
-        
-        const volunteers = await Volunteer.find();
-
-        console.log(volunteers);
-
-        res.status(200).json({
-
-            data: volunteers,
-            message: "Found volunteers successfuly !",
-            success: true
-
-        })
-
-    } catch (error) {
-
-        res.status(401).json({
-
-            message: error.message,
-            success: false
-
-        })
-
+    const isMatch = await bcrypt.compare(password, volunteer.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: "Invalid credentials" });
     }
 
-})
+    const token = jwt.sign(
+      { email: volunteer.email, id: volunteer._id, role: volunteer.role_id.role_name },
+      process.env.JWT_SECRET,
+      { expiresIn: "1d" }
+    );
 
-export const deleteVolunteer = async (req , res) => {
+    res.status(200).json({
+      message: "Login successful",
+      token,
+      volunteer: {
+        id: volunteer._id,
+        fullName: volunteer.fullName,
+        email: volunteer.email,
+        role: volunteer.role_id.role_name,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    res.status(500).json({ message: "Error logging in", error: err.message });
+  }
+};
 
-    const { id: _id } = req.params.id;
+// Get profile
+export const volunteerProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const volunteer = await Volunteer.findById(id).populate("role_id", "role_name");
+    if (!volunteer) {
+      return res.status(404).json({ message: "Volunteer not found" });
+    }
+    res.status(200).json(volunteer);
+  } catch (err) {
+    console.error("Error fetching profile:", err);
+    res.status(500).json({ message: "Error fetching profile", error: err.message });
+  }
+};
 
-    try {
+// Get all volunteers
+export const volunteers = async (req, res) => {
+  try {
+    const allVolunteers = await Volunteer.find().populate("role_id", "role_name");
+    res.status(200).json(allVolunteers);
+  } catch (err) {
+    console.error("Error fetching volunteers:", err);
+    res.status(500).json({ message: "Error fetching volunteers", error: err.message });
+  }
+};
 
-        const deletedVolunteer = await Volunteer.deleteOne(_id);
-        console.log(deletedVolunteer);
-        res.status(201).json({ message: "Volunteer Has been deleted successfuly !" });
-        
-    } catch (error) {
-        
-        throw new Error(error);
+// Update volunteer
+export const updateVolunteer = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
 
+    // Check if the logged-in user is admin or the owner of the profile
+    const requester = req.volunteerData; // set by verifyToken middleware (contains id, email, role)
+    
+    if (requester.role !== "admin" && requester.id !== id) {
+      return res.status(403).json({ message: "You can only update your own profile" });
     }
 
-}
-
-export const updateVolunteer = async (req , res) => {
-
-    const { id: _id } = req.params;
-
-    let newPost = req.body;
-
-    newPost.password = await bcrypt.hash(req.body.password , 10);
-
-    try {
-        
-        const post = await Volunteer.updateOne({_id: new mongoose.Types.ObjectId(_id)} , newPost);
-
-        res.status(201).json(post);
-
-    } catch (error) {
-        
-        console.log(error);
-
+    if (updateData.password) {
+      updateData.password = await bcrypt.hash(updateData.password, 10);
     }
 
-}
+    const updatedVolunteer = await Volunteer.findByIdAndUpdate(id, updateData, { new: true });
+    if (!updatedVolunteer) {
+      return res.status(404).json({ message: "Volunteer not found" });
+    }
+
+    res.status(200).json(updatedVolunteer);
+  } catch (err) {
+    console.error("Error updating volunteer:", err);
+    res.status(500).json({ message: "Error updating volunteer", error: err.message });
+  }
+};
+
+
+// Delete volunteer
+export const deleteVolunteer = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const deletedVolunteer = await Volunteer.findByIdAndDelete(id);
+    if (!deletedVolunteer) {
+      return res.status(404).json({ message: "Volunteer not found" });
+    }
+
+    res.status(200).json({ message: "Volunteer deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting volunteer:", error);
+    res.status(500).json({ message: "Error deleting volunteer", error: error.message });
+  }
+};
+
+// Logout
+export const logout = async (req, res) => {
+  res.status(200).json({ message: "Logged out successfully" });
+};

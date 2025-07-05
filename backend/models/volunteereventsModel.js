@@ -1,19 +1,17 @@
 import mongoose from 'mongoose';
 
-const Schema = mongoose.Schema;
-const volunteerEventsSchema = new Schema({
+const volunteerEventSchema = new mongoose.Schema({
+  volunteer_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Volunteer',
+    required: true,
+  },
+  event_id: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Event',
+    required: true,
+  },
+}, { timestamps: true });
 
-    volunteer_id : {
-        type : mongoose.Schema.Types.objectId,
-        ref: "Volunteer",
-        required: true
-    },
-    event_id : {
-        type : mongoose.Schema.Types.objectId,
-        ref: "Event",
-        required: true
-    },
-});
-
-const VolunteerEvent = mongoose.model('VolunteerEvent', volunteerEventsSchema);
+const VolunteerEvent = mongoose.model('VolunteerEvent', volunteerEventSchema);
 export default VolunteerEvent;
