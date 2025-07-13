@@ -5,7 +5,7 @@ import Volunteer from "../models/volunteerModel.js";
 
 dotenv.config();
 
-export default async (req, res, next) => {
+const verifyAdmin = async (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -28,13 +28,16 @@ export default async (req, res, next) => {
       return res.status(404).json({ message: "Role not found" });
     }
 
-    if (role.role_name === "admin") {
+    if (role.role_name === "admin" || role.role_name === "associate") {
+      req.role = role.role_name; // just for convenience
       return next();
     } else {
-      return res.status(403).json({ message: "You don't have access to this route" });
+      return res.status(403).json({ message: "Access denied: Admins only" });
     }
   } catch (err) {
-    console.error("VerifyRole error:", err);
+    console.error("verifyAdmin error:", err);
     return res.status(403).json({ message: "Invalid or expired token" });
   }
 };
+
+export default verifyAdmin;

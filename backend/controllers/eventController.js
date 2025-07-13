@@ -21,7 +21,7 @@ export const createEvent = async (req, res) => {
       description,
       date,
       location,
-      image: image || "" // fallback if image is undefined
+      image: image || ""
     });
 
     await newEvent.save();
@@ -65,5 +65,22 @@ export const deleteEvent = async (req, res) => {
   } catch (error) {
     console.error("Error deleting event:", error);
     res.status(500).json({ message: 'Error deleting event' });
+  }
+};
+
+
+export const getEventById = async (req, res) => {
+  try {
+    const eventId = req.params.id;
+    const event = await Event.findById(eventId);
+
+    if (!event) {
+      return res.status(404).json({ message: "Event not found" });
+    }
+
+    res.json(event);
+  } catch (error) {
+    console.error("Failed to get event by ID", error);
+    res.status(500).json({ message: "Server error" });
   }
 };

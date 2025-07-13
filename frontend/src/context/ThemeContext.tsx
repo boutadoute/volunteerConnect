@@ -1,4 +1,4 @@
-// src/context/ThemeContext.tsx
+
 import React, { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = "light" | "dark";
@@ -41,7 +41,6 @@ export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   );
 };
 
-// Clean and straightforward named export for the hook:
 export function useTheme() {
   const context = useContext(ThemeContext);
   if (!context) {

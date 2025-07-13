@@ -132,12 +132,6 @@
 // export default AppWrapper;
 
 
-
-
-
-
-
-
 import {
   BrowserRouter as Router,
   Routes,
@@ -151,50 +145,83 @@ import { RegisterPage } from "./pages/RegisterPage";
 import HomePage from "./pages/HomePage";
 import { VolunteerEventPage } from "./pages/volunteer/Events";
 import { AssociateEventPage } from "./pages/admin/Events";
+import { VolunteerEventDetails } from "./pages/volunteer/VolunteerEventDetails";
 import { AssociateDashboard } from "./pages/admin/Dashboard";
 import { VolunteerDashboard } from "./pages/volunteer/Dashboard";
 import { VolunteerSettings } from "./pages/volunteer/SettingsVolunteer";
 import { AssociateAdminSettings } from "./pages/admin/SettingsAdmin";
 import { ProtectedRoute, RoleProtectedRoute } from "@/routes/ProtectedRoute";
+import PublicHomePage from "./pages/PublicHomePage";
 import { FC, useState, useEffect, ReactNode } from "react";
 
+type UserRole = "admin" | "associate" | "volunteer";
 
+export type UserType = {
+  id: string;
+  name: string;
+  role: UserRole;
+  email: string;
+  token: string;
+};
+
+// Custom hook for authentication state management
 const useAuth = () => {
-  const [user, setUser] = useState<{ role: string; token: string } | null>(null);
+  const [user, setUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const savedUser = localStorage.getItem("user");
-    const savedToken = localStorage.getItem("token");
+    try {
+      const savedUser = localStorage.getItem("user");
+      const savedToken = localStorage.getItem("token");
 
-    if (savedUser && savedToken) {
-      try {
-        const parsedUser = JSON.parse(savedUser);
-        if (parsedUser?.role) {
-          setUser({ role: parsedUser.role, token: savedToken });
+      if (savedUser && savedToken) {
+        const parsedUser: UserType = JSON.parse(savedUser);
+        if (parsedUser?.role && parsedUser?.id) {
+          setUser({ ...parsedUser, token: savedToken });
         }
-      } catch {
-        localStorage.removeItem("user");
-        localStorage.removeItem("token");
       }
+    } catch (error) {
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      console.error("Error loading user from localStorage:", error);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   }, []);
 
   return { user, setUser, loading };
 };
 
-const Layout: FC<{ children: ReactNode; role?: string }> = ({ children, role }) => {
+// Layout component for consistent UI with sidebar
+const Layout: FC<{
+  children: ReactNode;
+  user?: UserType | null;
+  setUser: React.Dispatch<React.SetStateAction<UserType | null>>;
+}> = ({ children, user, setUser }) => {
   const location = useLocation();
   const isAuthPage = ["/login", "/register"].includes(location.pathname);
 
-  return isAuthPage ? (
-    <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
-      {children}
-    </main>
-  ) : (
+  // Show centered layout for auth pages without sidebar
+  if (isAuthPage) {
+    return (
+      <main className="min-h-screen flex items-center justify-center bg-background text-foreground">
+        {children}
+      </main>
+    );
+  }
+
+  // Show loading screen while user data is not ready
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Chargement de l'interface utilisateur...
+      </div>
+    );
+  }
+
+  return (
     <div className="flex min-h-screen bg-background text-foreground">
-      <Sidebar role={role || "volunteer"} userId="sidebarUserId" />
+      <Sidebar user={user} setUser={setUser} />
       <div className="flex-1 flex flex-col">
         <main className="flex-1 p-4 overflow-auto">{children}</main>
       </div>
@@ -202,82 +229,101 @@ const Layout: FC<{ children: ReactNode; role?: string }> = ({ children, role }) 
   );
 };
 
-
 const AppWrapper: FC = () => {
   const { user, setUser, loading } = useAuth();
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Chargement...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        Chargement de l'application...
+      </div>
+    );
   }
 
   return (
     <Router>
-      <Layout role={user?.role}>
-        <Routes>
-          <Route path="/" element={<Navigate to={user ? "/home" : "/login"} replace />} />
-          <Route path="/login" element={<LoginPage setUser={setUser} />} />
-          <Route path="/register" element={<RegisterPage />} />
+      <Routes>
+        {/* ✅ Public routes without sidebar */}
+        <Route path="/" element={<PublicHomePage />} />
+        <Route path="/login" element={<LoginPage setUser={setUser} />} />
+        <Route path="/register" element={<RegisterPage />} />
 
-          <Route
-      path="/home"
-      element={
-        <ProtectedRoute user={user}>
-          <HomePage user={user} />
-        </ProtectedRoute>
-  }
-/>
+        {/* ✅ Protected routes with layout */}
+        <Route
+          path="/*"
+          element={
+            <Layout user={user} setUser={setUser}>
+              <Routes>
+                <Route
+                  path="/home"
+                  element={
+                    <ProtectedRoute user={user}>
+                      <HomePage user={user} />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/volunteer/events"
+                  element={
+                    <RoleProtectedRoute user={user} allowedRoles={["volunteer"]}>
+                      <VolunteerEventPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/events"
+                  element={
+                    <RoleProtectedRoute user={user} allowedRoles={["admin", "associate"]}>
+                      <AssociateEventPage />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/admin/dashboard"
+                  element={
+                    <RoleProtectedRoute user={user} allowedRoles={["admin", "associate"]}>
+                      <AssociateDashboard />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/volunteer/dashboard"
+                  element={
+                    <RoleProtectedRoute user={user} allowedRoles={["volunteer"]}>
+                      <VolunteerDashboard />
+                    </RoleProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/volunteer/events/:id"
+                  element={
+                    <ProtectedRoute user={user}>
+                      <VolunteerEventDetails />
+                    </ProtectedRoute>
+                  }
+                />
+                <Route
+                  path="/settings"
+                  element={
+                    <ProtectedRoute user={user}>
+                      {user?.role === "volunteer" ? (
+                        <VolunteerSettings />
+                      ) : (
+                        <AssociateAdminSettings />
+                      )}
+                    </ProtectedRoute>
+                  }
+                />
+                {/* fallback for 404 inside layout */}
+                <Route path="*" element={<Navigate to="/home" replace />} />
+              </Routes>
+            </Layout>
+          }
+        />
 
-
-          <Route
-            path="/volunteer/events"
-            element={
-              <RoleProtectedRoute user={user} allowedRoles={["volunteer"]}>
-                <VolunteerEventPage />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/events"
-            element={
-              <RoleProtectedRoute user={user} allowedRoles={["admin", "associate"]}>
-                <AssociateEventPage />
-              </RoleProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/admin/dashboard"
-            element={
-              <RoleProtectedRoute user={user} allowedRoles={["admin", "associate"]}>
-                <AssociateDashboard />
-              </RoleProtectedRoute>
-            }
-          />
-          <Route
-            path="/volunteer/dashboard"
-            element={
-              <RoleProtectedRoute user={user} allowedRoles={["volunteer"]}>
-                <VolunteerDashboard />
-              </RoleProtectedRoute>
-            }
-          />
-
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute user={user}>
-                {user?.role === "volunteer" ? (
-                  <VolunteerSettings />
-                ) : (
-                  <AssociateAdminSettings />
-                )}
-              </ProtectedRoute>
-            }
-          />
-
-          <Route path="*" element={<Navigate to={user ? "/home" : "/login"} replace />} />
-        </Routes>
-      </Layout>
+        {/* Fallback for unmatched public paths */}
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </Router>
   );
 };

@@ -11,7 +11,13 @@ import { Button } from "@/components/ui/button";
 import { Link, useNavigate } from "react-router-dom";
 
 interface LoginPageProps {
-  setUser: React.Dispatch<React.SetStateAction<{ role: string; token: string } | null>>;
+  setUser: React.Dispatch<React.SetStateAction<{
+    id: string;
+    name: string;
+    role: string;
+    email: string;
+    token: string;
+  } | null>>;
 }
 
 const LoginPage = ({ setUser }: LoginPageProps) => {
@@ -43,16 +49,22 @@ const LoginPage = ({ setUser }: LoginPageProps) => {
 
       const { fullName, role, email: volunteerEmail, id } = data.volunteer;
 
-      console.log("✅ Login successful:", { fullName, role, id });
+      console.log(" Login successful:", { fullName, role, id });
 
       localStorage.setItem("user", JSON.stringify({ name: fullName, role, id, email: volunteerEmail }));
       localStorage.setItem("token", data.token);
       localStorage.setItem("userId", id);
 
-      setUser({ role, token: data.token });
+            setUser({
+        id,
+        name: fullName,
+        role,
+        email: volunteerEmail,
+        token: data.token,
+      });
       navigate("/home");
     } catch (err: any) {
-      console.error("❌ Login error:", err);
+      console.error(" Login error:", err);
       setError(err.message || "Erreur de connexion");
     } finally {
       setLoading(false);

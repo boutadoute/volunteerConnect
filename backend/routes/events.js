@@ -4,6 +4,7 @@ import {
   createEvent,
   updateEvent,
   deleteEvent,
+  getEventById 
 } from "../controllers/eventController.js";
 import verifyRole from "../middlewares/verifyRole.js";
 
@@ -16,5 +17,7 @@ router.delete("/remove/:id", verifyRole, deleteEvent);
 
 // Anyone can fetch events without authentication
 router.get("/get", getEvents);
+
+router.get("/:id", getEventById);
 
 export default router;

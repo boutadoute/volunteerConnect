@@ -38,7 +38,7 @@ export function AssociateEventPage() {
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
 
-  // ✅ Load from localStorage
+
   const token = localStorage.getItem("token");
   const role = JSON.parse(localStorage.getItem("user") || "{}")?.role;
   const userId = localStorage.getItem("userId");

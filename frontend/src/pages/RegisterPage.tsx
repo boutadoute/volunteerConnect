@@ -6,12 +6,12 @@ import { useNavigate } from "react-router-dom";
 export function RegisterPage() {
   const navigate = useNavigate();
 
-  const [fullName, setFullName] = useState(""); // Changed from name to fullName
+  const [fullName, setFullName] = useState(""); 
   const [phone_number, setPhoneNumber] = useState("");
   const [city, setCity] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [role, setRole] = useState("volunteer"); // default role
+  const [role, setRole] = useState("volunteer"); 
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -37,7 +37,7 @@ export function RegisterPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          fullName,// Corrected here
+          fullName,
           phone_number,
           city,
           email,
@@ -112,7 +112,7 @@ export function RegisterPage() {
             required
           />
 
-          {/* Role selection radio buttons */}
+
           <div className="flex space-x-4">
             <label>
               <input

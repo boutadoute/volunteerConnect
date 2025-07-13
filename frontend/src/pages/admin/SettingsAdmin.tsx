@@ -4,8 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent,      } from "@/components/ui/card";
-
+import { Card, CardContent } from "@/components/ui/card";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8000";
 
@@ -14,7 +13,7 @@ type UserRole = "associate" | "admin";
 type AdminSettingsData = {
   fullName: string;
   email: string;
-  phone: string;
+  phone: string; 
   role: UserRole;
   isActive: boolean;
   password?: string;
@@ -31,20 +30,26 @@ export function AssociateAdminSettings() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    const userId = localStorage.getItem("userId");
+    const storedUser = localStorage.getItem("user");
     const token = localStorage.getItem("token");
 
-    if (!userId || !token) {
+    if (!storedUser || !token) {
       setError("Utilisateur non connecté.");
       setLoading(false);
       return;
     }
 
+    const parsedUser = JSON.parse(storedUser);
+    const userId = parsedUser?.id;
+    const role = parsedUser?.role;
+
     const fetchData = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/api/users/profile/${userId}`, {
+        const routeBase = role === "admin" ? "admins" : "volunteers";
+        const res = await fetch(`${BACKEND_URL}/api/${routeBase}/profile/${userId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+
         if (!res.ok) throw new Error("Erreur lors du chargement des données");
 
         const json = await res.json();
@@ -74,20 +79,26 @@ export function AssociateAdminSettings() {
     if (!data) return;
 
     setSaving(true);
-    const userId = localStorage.getItem("userId");
+    const storedUser = localStorage.getItem("user");
     const token = localStorage.getItem("token");
 
-    if (!userId || !token) {
+    if (!storedUser || !token) {
       setError("Utilisateur non connecté.");
       setSaving(false);
       return;
     }
 
+    const parsedUser = JSON.parse(storedUser);
+    const userId = parsedUser?.id;
+    const role = parsedUser?.role;
+
     try {
       const payload: any = { ...data };
       if (!payload.password) delete payload.password;
 
-      const res = await fetch(`${BACKEND_URL}/api/users/update/${userId}`, {
+      const routeBase = role === "admin" ? "admins" : "volunteers";
+
+      const res = await fetch(`${BACKEND_URL}/api/${routeBase}/vol/update/${userId}`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -112,7 +123,6 @@ export function AssociateAdminSettings() {
 
   return (
     <div className="max-w-5xl mx-auto p-8 grid gap-10 grid-cols-1 md:grid-cols-2">
-      {/* Left Column */}
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-indigo-700">Profil Utilisateur</h2>
 
@@ -152,7 +162,7 @@ export function AssociateAdminSettings() {
               value={data.role}
               onValueChange={(value: UserRole) => setData({ ...data, role: value })}
             >
-              <SelectTrigger>
+              <SelectTrigger> 
                 <SelectValue placeholder="Sélectionner un rôle" />
               </SelectTrigger>
               <SelectContent>
@@ -171,7 +181,7 @@ export function AssociateAdminSettings() {
           </div>
 
           <div>
-            <Label htmlFor="password">Mot de passe (facultatif)</Label>
+            <Label htmlFor="password">nouvelle Mot de passe</Label>
             <Input
               id="password"
               type="password"
@@ -182,7 +192,6 @@ export function AssociateAdminSettings() {
         </div>
       </div>
 
-      {/* Right Column */}
       <div className="space-y-6">
         <h2 className="text-2xl font-bold text-indigo-700">Préférences</h2>
 
@@ -227,6 +236,4 @@ export function AssociateAdminSettings() {
     </div>
   );
 }
-
-
 
